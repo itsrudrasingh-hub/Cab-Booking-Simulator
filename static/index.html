@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SwiftCab — App Cab Booking Simulator</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Command Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 17h14v-5l-2.2-5.2A2 2 0 0 0 15 5.5H9a2 2 0 0 0-1.8 1.3L5 12v5z" />
+            <circle cx="7.5" cy="17" r="2" />
+            <circle cx="16.5" cy="17" r="2" />
+          </svg>
+        </div>
+        <div>
+          <span class="brand-title">SwiftCab</span>
+          <span class="brand-badge">SIMULATOR</span>
+        </div>
+      </div>
+
+      <div class="hud-stats">
+        <div class="hud-pill" title="Simulated City Clock">
+          <span class="hud-label">TIME</span>
+          <span id="hudClock" class="hud-value mono">09:00:00</span>
+        </div>
+        <div class="hud-pill" title="Available / Total Cabs">
+          <span class="hud-label">FLEET</span>
+          <span id="hudFleet" class="hud-value mono">16/16</span>
+        </div>
+        <div class="hud-pill" title="Current Traffic Condition">
+          <span class="hud-label">TRAFFIC</span>
+          <span id="hudTraffic" class="hud-value badge-moderate">MODERATE</span>
+        </div>
+        <div class="hud-pill" title="Peak Surge Multiplier">
+          <span class="hud-label">SURGE</span>
+          <span id="hudSurge" class="hud-value">AUTO</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="speed-group" role="group" aria-label="Simulation Speed">
+          <button class="speed-btn" data-speed="0" title="Pause Simulation">❚❚</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+          <button class="speed-btn" data-speed="5">5x</button>
+          <button class="speed-btn" data-speed="10">10x</button>
+        </div>
+        <button id="walletPillBtn" class="wallet-pill" title="View Wallet & History">
+          <span class="wallet-icon">💳</span>
+          <span id="hudWallet" class="mono">$85.00</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+      <!-- Interactive City Map -->
+      <section class="map-pane">
+        <div class="map-toolbar">
+          <div class="map-pick-controls">
+            <span class="map-hint-label">Click city node for:</span>
+            <button id="pickModePickup" class="pick-mode-btn active-pickup">
+              <span class="dot dot-green"></span> Pickup (A)
+            </button>
+            <button id="pickModeDropoff" class="pick-mode-btn">
+              <span class="dot dot-red"></span> Drop-off (B)
+            </button>
+          </div>
+          <div class="map-legend">
+            <span class="legend-item"><i class="swatch" style="background:#38bdf8"></i>Mini</span>
+            <span class="legend-item"><i class="swatch" style="background:#10b981"></i>EV</span>
+            <span class="legend-item"><i class="swatch" style="background:#a855f7"></i>Sedan</span>
+            <span class="legend-item"><i class="swatch" style="background:#f59e0b"></i>SUV</span>
+            <span class="legend-item"><i class="swatch surge-swatch"></i>Surge</span>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="cityCanvas"></canvas>
+          <div id="mapTooltip" class="map-tooltip hidden"></div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Mobile App + Simulator + History -->
+      <aside class="side-pane">
+        <nav class="panel-tabs">
+          <button class="tab-btn active" data-tab="ride">Ride App</button>
+          <button class="tab-btn" data-tab="sim">Simulator</button>
+          <button class="tab-btn" data-tab="history">History & Wallet</button>
+        </nav>
+
+        <!-- TAB 1: RIDE APP -->
+        <section id="tab-ride" class="tab-content active">
+          <!-- Booking Setup View -->
+          <div id="bookingView" class="view-section">
+            <div class="location-card">
+              <div class="loc-row">
+                <div class="loc-marker marker-a">A</div>
+                <div class="loc-field">
+                  <label for="pickupSelect">PICKUP LOCATION</label>
+                  <select id="pickupSelect"></select>
+                </div>
+              </div>
+
+              <div class="loc-divider">
+                <span class="divider-line"></span>
+                <button id="swapLocBtn" class="swap-btn" title="Swap Pickup and Drop-off">⇅</button>
+              </div>
+
+              <div class="loc-row">
+                <div class="loc-marker marker-b">B</div>
+                <div class="loc-field">
+                  <label for="dropoffSelect">DROP-OFF DESTINATION</label>
+                  <select id="dropoffSelect"></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="quick-routes">
+              <span class="section-micro-title">POPULAR ROUTES</span>
+              <div class="chip-row">
+                <button class="route-chip" data-from="N2_3" data-to="N0_6">Central Station → Airport</button>
+                <button class="route-chip" data-from="N1_1" data-to="N2_2">Tech Park → Downtown Mall</button>
+                <button class="route-chip" data-from="N0_2" data-to="N4_2">University → Stadium</button>
+              </div>
+            </div>
+
+            <div id="routeSummaryStrip" class="route-summary-strip hidden">
+              <div class="summary-stat">
+                <span class="stat-lbl">DISTANCE</span>
+                <span id="estDistance" class="stat-val mono">-- km</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-lbl">EST. TIME</span>
+                <span id="estDuration" class="stat-val mono">-- min</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-lbl">SURGE</span>
+                <span id="estSurge" class="stat-val mono">1.0x</span>
+              </div>
+            </div>
+
+            <div class="tiers-section">
+              <div class="section-header-row">
+                <span class="section-micro-title">CHOOSE A RIDE</span>
+                <span id="surgeNotice" class="surge-pill hidden">⚡ Peak Demand</span>
+              </div>
+              <div id="tiersList" class="tiers-list"></div>
+            </div>
+
+            <div class="checkout-options">
+              <div class="promo-row">
+                <input id="promoInput" type="text" placeholder="Promo code (e.g. FIRST50, SAVE20)" />
+                <button id="applyPromoBtn" class="btn-secondary">Apply</button>
+              </div>
+              <div id="promoFeedback" class="promo-feedback">
+                Try: <button class="promo-tag" data-code="FIRST50">FIRST50</button>
+                <button class="promo-tag" data-code="SAVE20">SAVE20</button>
+                <button class="promo-tag" data-code="SWIFTVIP">SWIFTVIP</button>
+              </div>
+
+              <div class="payment-row">
+                <span class="section-micro-title">PAYMENT</span>
+                <div class="payment-pills">
+                  <button class="pay-pill active" data-pay="wallet">Wallet</button>
+                  <button class="pay-pill" data-pay="card">Card •4242</button>
+                  <button class="pay-pill" data-pay="upi">UPI</button>
+                  <button class="pay-pill" data-pay="cash">Cash</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="bookingError" class="inline-error hidden"></div>
+
+            <button id="bookRideBtn" class="btn-primary-cta">
+              Book CabGo Mini
+            </button>
+          </div>
+
+          <!-- Active Ride View -->
+          <div id="activeRideView" class="view-section hidden">
+            <div id="rideStatusBanner" class="status-banner">
+              <div class="status-pulse"></div>
+              <div>
+                <div id="rideStatusTitle" class="status-title">Searching for drivers...</div>
+                <div id="rideStatusSub" class="status-sub">Contacting nearby cabs</div>
+              </div>
+              <div id="rideLiveMeter" class="live-meter mono">$0.00</div>
+            </div>
+
+            <div class="progress-card">
+              <div class="progress-route-labels">
+                <span id="activePickupLbl">Pickup</span>
+                <span class="arrow">→</span>
+                <span id="activeDropoffLbl">Drop-off</span>
+              </div>
+              <div class="progress-track">
+                <div id="rideProgressBar" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <div class="progress-metrics">
+                <span id="activeMetricLeft" class="mono">ETA --</span>
+                <span id="activeMetricRight" class="mono">-- km</span>
+              </div>
+            </div>
+
+            <!-- Searching Radar -->
+            <div id="searchingBox" class="searching-box hidden">
+              <div class="radar">
+                <div class="radar-ring"></div>
+                <div class="radar-ring delay"></div>
+                <div class="radar-core">🚕</div>
+              </div>
+              <p>Broadcasting request to nearest <strong id="searchingTierName">Cab</strong> drivers...</p>
+            </div>
+
+            <!-- Driver Assigned Card -->
+            <div id="driverCard" class="driver-card hidden">
+              <div class="driver-top">
+                <div id="driverAvatar" class="driver-avatar">MV</div>
+                <div class="driver-info">
+                  <div class="driver-name-row">
+                    <span id="driverName" class="driver-name">Driver Name</span>
+                    <span id="driverRating" class="rating-badge">★ 4.92</span>
+                  </div>
+                  <div id="driverVehicle" class="driver-vehicle">Toyota Corolla • SC-4012</div>
+                </div>
+                <div class="otp-box" title="Share this PIN with your driver to start the trip">
+                  <span class="otp-label">RIDE PIN</span>
+                  <span id="rideOtpDisplay" class="otp-code mono">4829</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- OTP Verification Box (Shown on ARRIVED) -->
+            <div id="otpVerifyBox" class="otp-verify-box hidden">
+              <div class="otp-verify-header">
+                <strong>Driver Arrived!</strong> Enter Ride PIN to start trip
+              </div>
+              <div class="otp-verify-row">
+                <input id="otpInput" type="text" maxlength="4" placeholder="4-digit PIN" class="mono" />
+                <button id="verifyOtpBtn" class="btn-primary-sm">Start Ride</button>
+                <button id="autoFillOtpBtn" class="btn-secondary-sm" title="Auto-fill & start">Auto</button>
+              </div>
+              <div id="otpError" class="inline-error hidden"></div>
+            </div>
+
+            <!-- Chat Drawer -->
+            <div id="chatBox" class="chat-box">
+              <div class="chat-header">Driver Chat</div>
+              <div id="chatMessages" class="chat-messages"></div>
+              <div class="chat-quick-replies">
+                <button class="quick-msg-btn" data-msg="Where are you right now?">Where are you?</button>
+                <button class="quick-msg-btn" data-msg="Coming down now!">Coming down</button>
+                <button class="quick-msg-btn" data-msg="I am at the main entrance.">At main gate</button>
+              </div>
+              <div class="chat-input-row">
+                <input id="chatInput" type="text" placeholder="Message driver..." />
+                <button id="sendChatBtn" class="btn-secondary-sm">Send</button>
+              </div>
+            </div>
+
+            <div class="active-actions-row">
+              <button id="shareRideBtn" class="btn-outline">Share Trip</button>
+              <button id="sosBtn" class="btn-outline btn-warn">SOS</button>
+              <button id="cancelRideBtn" class="btn-outline btn-danger">Cancel Ride</button>
+            </div>
+          </div>
+
+          <!-- Completed / Cancelled Receipt View -->
+          <div id="receiptView" class="view-section hidden">
+            <div id="receiptBanner" class="receipt-banner">
+              <div id="receiptIcon" class="receipt-icon">✓</div>
+              <h3 id="receiptTitle">Trip Completed!</h3>
+              <p id="receiptSubtitle">Thanks for riding with SwiftCab</p>
+            </div>
+
+            <div class="receipt-card">
+              <div class="receipt-route">
+                <div><span class="dot dot-green"></span> <span id="recPickup">--</span></div>
+                <div><span class="dot dot-red"></span> <span id="recDropoff">--</span></div>
+              </div>
+              <div id="receiptBreakdown" class="receipt-breakdown"></div>
+            </div>
+
+            <div id="ratingSection" class="rating-section">
+              <div class="section-micro-title">RATE YOUR DRIVER</div>
+              <div class="stars-row" id="starsRow">
+                <button class="star-btn active" data-star="1">★</button>
+                <button class="star-btn active" data-star="2">★</button>
+                <button class="star-btn active" data-star="3">★</button>
+                <button class="star-btn active" data-star="4">★</button>
+                <button class="star-btn active" data-star="5">★</button>
+              </div>
+              <div class="tags-row">
+                <button class="feedback-tag" data-tag="Smooth Drive">Smooth Drive</button>
+                <button class="feedback-tag" data-tag="Clean Cab">Clean Cab</button>
+                <button class="feedback-tag" data-tag="Polite">Polite</button>
+                <button class="feedback-tag" data-tag="Great Route">Great Route</button>
+              </div>
+              <div class="tip-row">
+                <span class="section-micro-title">ADD A TIP</span>
+                <div class="tip-pills">
+                  <button class="tip-pill active" data-tip="0">$0</button>
+                  <button class="tip-pill" data-tip="2">$2</button>
+                  <button class="tip-pill" data-tip="5">$5</button>
+                  <button class="tip-pill" data-tip="10">$10</button>
+                </div>
+              </div>
+              <button id="submitRatingBtn" class="btn-primary-cta">Submit Rating & Done</button>
+            </div>
+
+            <button id="bookAnotherBtn" class="btn-secondary full-width hidden">Book Another Ride</button>
+          </div>
+        </section>
+
+        <!-- TAB 2: SIMULATOR CONTROLS -->
+        <section id="tab-sim" class="tab-content">
+          <div class="sim-block">
+            <div class="section-micro-title">TRAFFIC CONDITIONS</div>
+            <div class="segmented-row" id="trafficControls">
+              <button class="seg-btn" data-traffic="low">Low</button>
+              <button class="seg-btn active" data-traffic="moderate">Moderate</button>
+              <button class="seg-btn" data-traffic="heavy">Heavy</button>
+            </div>
+          </div>
+
+          <div class="sim-block">
+            <div class="section-micro-title">SURGE PRICING MODE</div>
+            <div class="segmented-row" id="surgeControls">
+              <button class="seg-btn active" data-surge="auto">Auto</button>
+              <button class="seg-btn" data-surge="rush_hour">Rush Hour</button>
+              <button class="seg-btn" data-surge="flat">Flat 1.0x</button>
+            </div>
+          </div>
+
+          <div class="sim-block">
+            <div class="section-micro-title">DISPATCH & FLEET ACTIONS</div>
+            <div class="sim-action-grid">
+              <button id="spawnCabBtn" class="btn-secondary">+ Spawn Random Cab</button>
+              <button id="spawnAtPickupBtn" class="btn-secondary">+ Spawn at Pickup</button>
+              <button id="toggleDeclineBtn" class="btn-secondary">Simulate Next Decline: OFF</button>
+              <button id="resetSimBtn" class="btn-outline btn-danger">Reset City World</button>
+            </div>
+          </div>
+
+          <div class="sim-block">
+            <div class="section-micro-title">LIVE FLEET (<span id="fleetCountLbl">16</span>)</div>
+            <div id="fleetList" class="fleet-list"></div>
+          </div>
+
+          <div class="sim-block">
+            <div class="section-micro-title">DISPATCH EVENT LOG</div>
+            <div id="eventLogList" class="event-log-list"></div>
+          </div>
+        </section>
+
+        <!-- TAB 3: HISTORY & WALLET -->
+        <section id="tab-history" class="tab-content">
+          <div class="wallet-card">
+            <div>
+              <div class="wallet-card-label">SWIFTCAB WALLET BALANCE</div>
+              <div id="walletCardBalance" class="wallet-card-amount mono">$85.00</div>
+            </div>
+            <div class="wallet-topup-row">
+              <button class="topup-btn" data-amount="25">+$25</button>
+              <button class="topup-btn" data-amount="50">+$50</button>
+              <button class="topup-btn" data-amount="100">+$100</button>
+            </div>
+          </div>
+
+          <div class="sim-block">
+            <div class="section-micro-title">RECENT RIDES</div>
+            <div id="historyList" class="history-list">
+              <div class="empty-state">No rides completed or cancelled yet. Book your first simulated cab!</div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
